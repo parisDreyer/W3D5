@@ -5,14 +5,16 @@ require 'active_support/inflector'
 
 class SQLObject
   def self.columns
-
-    query = "select * from #{self.table_name} limit 1"
-    @@columns ||= DBConnection.execute2(query)
-    [:id, :name, :owner_id]
+    @columns ||= DBConnection.execute2(<<-SQL).first.map(&:to_sym)
+      SELECT
+        *
+      FROM
+        #{self.table_name}
+    SQL
   end
 
   def self.finalize!
-    (self.columns).each do |col|
+    self.columns.each do |col|
       define_method(col) do
         attributes[col]
       end
@@ -23,24 +25,14 @@ class SQLObject
   end
 
   def self.table_name=(table_name)
-    snaked = self.camel_to_snake_case(table_name)
-    @@table_name = self.pluralize(snaked.downcase)
+    @table_name = table_name
   end
 
   def self.table_name
-    @@table_name ||= self.pluralize(self.camel_to_snake_case(self.to_s))
+    @table_name ||= self.to_s.tableize
   end
 
-  def self.camel_to_snake_case(to_snake)
-    snaked = ""
-    to_snake.each_char.with_index do |ch, i|
-      if ch == ch.upcase && i > 0
-        snaked += '_'
-      end
-      snaked += ch.downcase
-    end
-    snaked
-  end
+
 
   def self.pluralize(name)
     if name[-1] == 's'
@@ -53,27 +45,42 @@ class SQLObject
   end
 
   def self.all
-    # ...
+    res = DBConnection.execute(<<-SQL)
+      SELECT *
+      FROM #{self.table_name}
+    SQL
+    all_params = []
+    res.each do |params|
+        new_params = {}
+        params.each { |k, v| new_params[k.to_sym] = v }
+        all_params << new_params
+    end
+    self.parse_all(all_params)
   end
 
   def self.parse_all(results)
-    # ...
+    results.map { |params| new(params)}
   end
 
   def self.find(id)
-    # ...
+
+    res = DBConnection.execute(<<-SQL, id)
+      SELECT *
+      FROM #{self.table_name}
+      WHERE id = ?
+    SQL
+    res.empty? ? nil : res
   end
 
   def initialize(params = {})
-    SQLObject.finalize! #unless params.empty?
     params.each do |attr_name,v|
-      unless SQLObject.columns.include?(attr_name)
+      unless self.class.columns.include?(attr_name)
         raise "unknown attribute '#{attr_name}'"
       end
       if v
-        self.send(attr_name.to_sym, v)
+        send("#{attr_name.to_sym}=", v)
       elsif attr_name
-        self.send(attr_name.to_sym)
+        send(attr_name.to_sym)
       end
     end
 

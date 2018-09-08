@@ -36,21 +36,21 @@ describe SQLObject do
 
     describe '::columns' do
 
-      it 'only queries the DB once' do
-        expect(DBConnection).to(
-          receive(:execute2).exactly(1).times.and_call_original)
-        3.times { Cat.columns }
-      end
-
-      it 'returns a list of all column names as symbols' do
-        expect(Cat.columns).to eq([:id, :name, :owner_id])
-      end
-
       # it 'only queries the DB once' do
       #   expect(DBConnection).to(
       #     receive(:execute2).exactly(1).times.and_call_original)
       #   3.times { Cat.columns }
       # end
+
+      it 'returns a list of all column names as symbols' do
+        expect(Cat.columns).to eq([:id, :name, :owner_id])
+      end
+
+      it 'only queries the DB once' do
+        expect(DBConnection).to(
+          receive(:execute2).exactly(1).times.and_call_original)
+        3.times { Cat.columns }
+      end
     end
 
     describe '#attributes' do
